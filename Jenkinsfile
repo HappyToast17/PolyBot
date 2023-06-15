@@ -1,9 +1,18 @@
 @Library("devops22-sharedlib") _
 pipeline {
     agent {
-        docker {
-            image 'jenkins-agent:latest'
-            args  '--user root -v /var/run/docker.sock:/var/run/docker.sock'
+        kubernetes {
+            yaml '''
+        apiVersion: v1
+        kind: Pod
+        spec:
+          containers:
+          - name: jenkins-agent
+            image: jenkins-agent:latest
+            command:
+            - cat
+            tty: true
+        '''
         }
     }
     environment {

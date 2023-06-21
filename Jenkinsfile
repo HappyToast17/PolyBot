@@ -1,18 +1,22 @@
 @Library("devops22-sharedlib") _
+
 pipeline {
     agent {
         kubernetes {
             yaml '''
-        apiVersion: v1
-        kind: Pod
-        spec:
-          containers:
-          - name: jenkins-agent
-            image: jenkins-agent:latest
-            command:
-            - cat
-            tty: true
-        '''
+                apiVersion: v1
+                kind: Pod
+                spec:
+                  serviceAccountName: jenkins
+                  containers:
+                    - name: jenkins-agent
+                      image: happytoast/jenkinsdockeragent:latest
+                      imagePullPolicy: Always
+                      tty: true
+                  securityContext:
+                    allowPrivilegeEscalation: false
+                    runAsUser: 0
+            '''
         }
     }
     environment {
@@ -28,30 +32,30 @@ pipeline {
         timeout(time: 10, unit: 'MINUTES')
     }
     stages {
-            stage('Installations') {
+        stage('Installations') {
             steps {
                 install()
             }
         }
-    stage('Tests') {
-    parallel {
-    stage('PylintTest') {
+        stage('Tests') {
+            parallel {
+                stage('PylintTest') {
                     steps {
-                            sh "python3 -m pylint --exit-zero -f parseable --reports=no *.py > pylint.log"
+                        sh "python3 -m pylint --exit-zero -f parseable --reports=no *.py > pylint.log"
                     }
+                }
+                stage('PolyTest') {
+                    steps {
+                        withCredentials([string(credentialsId: 'telegramToken', variable: 'TELEGRAM_TOKEN')]) {
+                            sh "touch .telegramToken"
+                            sh "echo ${TELEGRAM_TOKEN} > .telegramToken"
+                            sh "python3 -m pytest --junitxml results.xml tests/polytest.py"
+                        }
                     }
-    stage('PolyTest') {
-            steps {
-                withCredentials([string(credentialsId: 'telegramToken', variable: 'TELEGRAM_TOKEN')]) {
-                sh "touch .telegramToken"
-                sh "echo ${TELEGRAM_TOKEN} > .telegramToken"
-                sh "python3 -m pytest --junitxml results.xml tests/polytest.py"
                 }
             }
         }
-        }
-        }
-    stage('Build Bot App') {
+        stage('Build Bot App') {
             steps {
                 withCredentials([usernamePassword(credentialsId: 'DockerTokenID', passwordVariable: 'myaccesstoken', usernameVariable: 'happytoast')]) {
                     sh "docker login --username $happytoast --password $myaccesstoken"
@@ -78,11 +82,11 @@ pipeline {
             sh "docker rmi happytoast/build_bot:${BUILD_NUMBER}"
             junit allowEmptyResults: true, testResults: 'results.xml'
             sh 'cat pylint.log'
-    recordIssues (
-      enabledForFailure: true,
-      aggregatingResults: true,
-      tools: [pyLint(name: 'Pylint', pattern: '**/pylint.log')]
-    )
+            recordIssues (
+                enabledForFailure: true,
+                aggregatingResults: true,
+                tools: [pyLint(name: 'Pylint', pattern: '**/pylint.log')]
+            )
         }
     }
 }

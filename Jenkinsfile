@@ -3,20 +3,31 @@
 pipeline {
     agent {
         kubernetes {
+            defaultContainer 'jenkins-agent'
             yaml '''
                 apiVersion: v1
                 kind: Pod
+                metadata:
+                  labels:
+                    some-label: jenkins-eks-pod
                 spec:
                   serviceAccountName: jenkins
                   containers:
-                    - name: jenkins-agent
-                      image: happytoast/jenkinsdockeragent:latest
-                      imagePullPolicy: Always
-                      tty: true
+                  - name: jenkins-agent
+                    image: happytoast/jenkinsdockeragent:latest
+                    imagePullPolicy: Always
+                    volumeMounts:
+                     - name: jenkinsagent-pvc
+                       mountPath: /var/run/docker.sock
+                    tty: true
+                  volumes:
+                  - name: jenkinsagent-pvc
+                    hostPath:
+                      path: /var/run/docker.sock
                   securityContext:
                     allowPrivilegeEscalation: false
                     runAsUser: 0
-            '''
+                '''
         }
     }
     environment {

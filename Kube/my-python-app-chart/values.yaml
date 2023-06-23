@@ -1,0 +1,5 @@
+replicaCount: 3
+image:
+  repository: happytoast/build_bot
+  tag: 67
+  pullPolicy: IfNotPresent
